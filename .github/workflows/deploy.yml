@@ -1,0 +1,56 @@
+name: Publicar site
+
+on:
+  repository_dispatch:
+    types: [nc-deploy]
+  workflow_dispatch:
+  schedule:
+    - cron: '30 9 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do acervo
+        uses: actions/checkout@v4
+        with:
+          repository: frederico-kluser/newsletter-crawler
+          ref: main
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+      - name: Dependencias
+        working-directory: webapp
+        run: npm install --no-audit --no-fund
+      - name: Build
+        working-directory: webapp
+        run: npm run build
+      - name: Sem Jekyll
+        run: touch webapp/dist/.nojekyll
+      - name: Artefato
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
